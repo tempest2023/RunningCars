@@ -1,0 +1,235 @@
+.main {
+  margin-top: 20px;
+  margin-bottom: 100px;
+  margin-left: 20px;
+  margin-right: 20px;
+}
+
+.map {
+  height: 100%;
+  weight: 90%;
+  overflow-x: scroll;
+  overflow-y: hidden;
+}
+
+.container {
+  margin-top: 20px;
+  width: 100%;
+  height: 100%;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, 60px 150px);
+  grid-template-rows: repeat(auto-fill, 60px 150px);
+}
+
+.hide_block {
+  display: none;
+}
+
+.grid_cross {
+  width: 60px;
+  height: 60px;
+  border: 1px dashed #000;
+  border-radius: 40px;
+}
+
+.grid_roads1 {
+  width: 150px;
+  height: 60px;
+  border-top: 1px solid #000;
+  border-bottom: 1px solid #000;
+  background-color: #F2D3B3;
+}
+
+.grid_roads2 {
+  width: 60px;
+  height: 150px;
+  border-left: 1px solid #000;
+  border-right: 1px solid #000;
+  background-color: #F2D3B3;
+}
+
+.grid_street {
+  width: 150px;
+  height: 150px;
+  background-color: #F2D3B3;
+}
+
+.active_cross {
+  background-color: #fff;
+}
+
+.active_roads {
+  background-color: #fff;
+}
+
+.grid_roads1_container {
+  display: grid;
+  grid-template-rows: repeat(auto-fill);
+  grid-template-columns: repeat(auto-fill);
+  margin: 0px;
+  padding: 0px;
+  height: 60px;
+  weight: 150px;
+}
+
+.grid_roads2_container {
+  display: grid;
+  grid-template-rows: repeat(auto-fill);
+  grid-template-columns: repeat(auto-fill);
+  margin: 0px;
+  padding: 0px;
+  height: 150px;
+  weight: 60px;
+}
+
+.car_box {}
+
+.cross_info {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  font-size: 1em;
+  text-align: center;
+  vertical-align: center;
+}
+
+.cross_info_id {
+  font-weight: bold;
+  font-size: 1.5em;
+  color: #000;
+}
+
+.cross_info_start_cars {
+  font-weight: normal;
+  font-size: 1em;
+  color: #EE0629;
+}
+
+.cross_info_arrive_cars {
+  font-weight: normal;
+  font-size: 1em;
+  color: #7C7C80;
+}
+
+.car_status1 {}
+
+.car_status0 {
+  background-color: #fff;
+}
+
+.controller_panel {
+  position: fixed;
+  width: 200px;
+  right: 5px;
+  top: 5px;
+  height: 500px;
+  z-index: 11;
+}
+
+.row_info {
+  margin: 0px !important;
+  padding: 0px !important;
+  width: 150px;
+  height: 50px;
+}
+
+.align_info {
+  display: inline-block;
+  font-weight: bold;
+  color: #000;
+  border-radius: 1px;
+  text-align: center;
+  overflow: visible;
+  padding: 0px;
+  margin: 0px;
+  width: 150px;
+  height: 30px;
+  z-index: 5;
+  line-height: 20px;
+  vertical-align: text-bottom;
+}
+
+.vertical_info {
+  display: inline-block;
+  font-weight: bold;
+  color: #000;
+  border-radius: 1px;
+  text-align: center;
+  writing-mode: vertical-lr;
+  overflow: visible;
+  padding: 0px;
+  margin: 0px;
+  width: 50px;
+  height: 90px;
+  z-index: 5;
+}
+
+.tips span {
+  display: none;
+  color: #fff;
+  background: rgba(51, 51, 51, 0.75);
+  border-radius: 1px;
+  -moz-border-radius: 1px;
+  -webkit-border-radius: 1px;
+  text-align: center;
+  position: absolute;
+  z-index: 10;
+  padding: 5px;
+  overflow: visible;
+}
+
+.tips_show span {
+  color: #fff;
+  background: rgba(51, 51, 51, 0.75);
+  border-radius: 1px;
+  -moz-border-radius: 1px;
+  -webkit-border-radius: 1px;
+  text-align: center;
+  position: absolute;
+  z-index: 10;
+  padding: 5px;
+  display: block;
+}
+
+.tips:hover span {
+  display: block;
+}
+
+span.black {
+  background: rgba(0, 0, 0, 0.75);
+  border: 1px solid #1E5799;
+}
+
+@keyframes fade {
+  from {
+    opacity: 1.0;
+  }
+
+  50% {
+    opacity: 0.4;
+  }
+
+  to {
+    opacity: 1.0;
+  }
+}
+
+@-webkit-keyframes fade {
+  from {
+    opacity: 1.0;
+  }
+
+  50% {
+    opacity: 0.4;
+  }
+
+  to {
+    opacity: 1.0;
+  }
+}
+
+.trackCar {
+  background-color: #000;
+  animation: fade 600ms infinite;
+  -webkit-animation: fade 600ms infinite;
+}

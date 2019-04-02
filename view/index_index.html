@@ -1,0 +1,707 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <meta charset="UTF-8">
+  <title>New ThinkJS Application</title>
+  <link href="/static/css/bootstrap.min.css" rel="stylesheet">
+  <link href="/static/css/main.css" rel="stylesheet">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+  <script src="/static/js/jquery.min.js"></script>
+  <script src="/static/js/tooltip.js"></script>
+  <script src="/static/js/bootstrap.min.js"></script>
+  <script src="/static/js/react.js"></script>
+  <script src="/static/js/react-dom.js"></script>
+  <script src="/static/js/browser.min.js"></script>
+  <script src="/static/js/PubSubJS/src/pubsub.js"></script>
+  <script src="/static/js/njs_compile.js"></script>
+  <script id="testCode" type="text/x-narrativejs">
+    // sad but true: Firefox doesn't guarantee that the specified amount of // sader but true,chrome,either. sleep->(5000);
+  </script>
+</head>
+
+<body>
+  <div id="main" class="main">
+
+  </div>
+
+</body>
+
+<script type="text/babel">
+  var Cars = [],
+  Cross = [],
+  Roads = [];
+  var Historys=[];
+  var SizeA,SizeB;
+  var gridCrossMap={};//保存Cross的((i,j):CrossObj);
+  var gridRoadMap={};//保存Road的((id):RoadObj);
+  var gridMap={};
+  var Client_Tick=0;
+  var direction=["top","right","bottom","left"];
+  var CarHashMap={};
+  var CrossHashMap={};
+  var RoadsHashMap={};
+  var TrackCar=10000;
+  var TrackRoad=[5000];
+  var CarColors=["#FCB70D","#1A7EE6","#FC2AAA","#30D2D7","#16E9E0","#DE3AE2","#C1E85A","#FFC166","#C974AF","#987C42","#EBA5EA","#F9942C","#F06618","#88F1E1","#6E1EF0","#E81C5F","#2DE4DC"];
+  //// TODO:
+  //// Controller控制Tick 加减，Roads组件刷新
+  //// Controller追踪车辆，高亮显示
+  ////
+  //// PS:
+  //// 更新道路状况实际需要更新的gridMap
+  let tickUpdate=function(){
+    return $.ajax({
+        url: '/index/isUpdate',
+        type: 'GET',
+        dataType: 'json',
+        success: function(data)
+        {
+            if(data["errno"]==0 && (data["data"]["update"]==true || data["data"]["update"]=="true")){
+              return true;
+            }
+            else {
+              return false;
+            }
+        }
+      }).fail(function() {
+        console.log("获取更新数据失败!");
+      });
+  }
+  let getData = function() {
+    return $.ajax({
+        url: '/index/selectStatus',
+        type: 'GET',
+        dataType: 'json',
+        success: function(data) {
+          // console.log(data);
+          if (data["errno"] == 0) {
+            data = data["data"];
+            let Temp_data;
+            if(Historys.length>=0){
+              //因为数据不是实时更新的,所以要先存起来等待更新
+              //这里存储正在使用的数据,一会儿恢复
+              Temp_data={
+                "Cars":Cars,
+                "Cross":Cross,
+                "Roads":Roads
+              };
+            }
+            Cars = data["cars"];
+            Cross = data["cross"];
+            Roads = data["roads"];
+            if(Cars==undefined || Cross==undefined || Roads==undefined){
+              return;
+            }
+            //数据处理,把对应的int变成引用关联起来
+            for(let r of Roads){
+              r["pos"]=null;
+              for(let c of Cross){
+                if(r["start"]==c["id"]){
+                  r["start"]=c;
+                }
+                if(r["to"]==c["id"]){
+                  r["to"]=c;
+                }
+                for(let d of direction){
+                  if(c[d]==r["id"]){
+                    c[d]=r;
+                  }
+                  if(c[d]==-1){
+                    c[d]=null;
+                  }
+                }
+              }
+              if(RoadsHashMap[r["id"]]==undefined){
+                RoadsHashMap[r["id"]]=r;
+              }
+            }
+            for(let c of Cross){
+              c["edge"]=4;
+              if(c["top"]==-1)c["edge"]--;
+              if(c["right"]==-1)c["edge"]--;
+              if(c["bottom"]==-1)c["edge"]--;
+              if(c["left"]==-1)c["edge"]--;
+              c["start_cars"]=0;
+              c["arrive_cars"]=0;
+              for(let car=0;car<Cars.length;car++){
+                if(Cars[car]["start"]==c["id"]){
+                  c["start_cars"]++;
+                }
+                if(Cars[car]["to"]==c["id"]){
+                  c["arrive_cars"]++;
+                }
+              }
+              if(CrossHashMap[c["id"]]==undefined){
+                CrossHashMap[c["id"]]=c;
+              }
+            }
+            for(let c=0;c<Cars.length;c++){
+              if(CarHashMap[Cars[c]["id"]]==undefined){
+                //没有出现过就随机分配一个颜色
+                CarHashMap[Cars[c]["id"]]=Cars[c];
+                CarHashMap[Cars[c]["id"]]["color"]=CarColors[parseInt(Math.random(0,1)*CarColors.length)];
+              }
+            }
+            //整理完数据,放置数据到图上
+            drawMap(Temp_data);
+            // console.log(Roads);
+          } else {
+            console.log(data["errmsg"]);
+          }
+        }
+      })
+      .fail(function() {
+        console.log("获取道路数据失败!");
+      });
+  };
+  function whatType(i,j){
+    if(i%2!=0 && j%2!=0){
+      return "cross";
+    }
+    else if((i+j)%2!=0){
+      return "road";
+    }else{
+      return "street";
+    }
+  }
+  function goAround(now,i,j){
+    if(now["pos"]!=null){return;}
+    now["pos"]=[i,j];
+    gridCrossMap[now["id"]]=now["pos"];
+    if(now["top"]!=null){
+      now["top"]["pos"]=[i-1,j];
+      gridRoadMap[now["top"]["id"]]=now["top"]["pos"];
+      if(now["top"]["start"]["id"]==now["id"]){
+        goAround(now["top"]["to"],i-2,j);
+      }
+      if(now["top"]["to"]["id"]==now["id"]){
+        goAround(now["top"]["start"],i-2,j);
+      }
+    }
+    if(now["right"]!=null){
+      now["right"]["pos"]=[i,j+1];
+      gridRoadMap[now["right"]["id"]]=now["right"]["pos"];
+      if(now["right"]["start"]["id"]==now["id"]){
+        goAround(now["right"]["to"],i,j+2);
+      }
+      if(now["right"]["to"]["id"]==now["id"]){
+        goAround(now["right"]["start"],i,j+2);
+      }
+    }
+    if(now["bottom"]!=null){
+      now["bottom"]["pos"]=[i+1,j];
+      gridRoadMap[now["bottom"]["id"]]=now["bottom"]["pos"];
+      if(now["bottom"]["start"]["id"]==now["id"]){
+        goAround(now["bottom"]["to"],i+2,j);
+      }
+      if(now["bottom"]["to"]["id"]==now["id"]){
+        goAround(now["bottom"]["start"],i+2,j);
+      }
+    }
+    if(now["left"]!=null){
+      now["left"]["pos"]=[i,j-1];
+      gridRoadMap[now["left"]["id"]]=now["left"]["pos"];
+      if(now["left"]["start"]["id"]==now["id"]){
+        goAround(now["left"]["to"],i,j-2);
+      }
+      if(now["left"]["to"]["id"]==now["id"]){
+        goAround(now["left"]["start"],i,j-2);
+      }
+    }
+  }
+  var drawMap=function(Temp_data){
+    if(Roads.length<=0)return;
+    let _tmp=goAround(Cross[0],1,1);
+    let TopMin=Cross[0]['pos'][0];
+    let BottomMax=Cross[0]['pos'][0];
+    let RightMax=Cross[0]['pos'][1];
+    let LeftMin=Cross[0]['pos'][1];
+    for(let k in gridCrossMap){
+      // console.log(gridCrossMap[k][0],gridCrossMap[k][1])
+      if(gridCrossMap[k][0]<TopMin){
+        TopMin=gridCrossMap[k][0];
+      }
+      if(gridCrossMap[k][0]>BottomMax){
+        BottomMax=gridCrossMap[k][0];
+      }
+      if(gridCrossMap[k][1]<LeftMin){
+        LeftMin=gridCrossMap[k][1];
+      }
+      if(gridCrossMap[k][1]>RightMax){
+        RightMax=gridCrossMap[k][1];
+      }
+    }
+    // console.log(gridCrossMap);
+    // console.log(gridRoadMap);
+    //修正坐标
+    let shiftDistanceAlign=LeftMin-1;
+    let shiftDistanceVerticle=TopMin-1;
+    RightMax = RightMax-shiftDistanceAlign;
+    //size 最后要+1是因为grid从1开始计数,奇数+1是因为奇数画出来的图不好看
+    SizeA = RightMax%2!=0?(RightMax+1):RightMax;
+    BottomMax = BottomMax-shiftDistanceVerticle;
+    SizeB = BottomMax%2!=0?(BottomMax+1):BottomMax;
+    // console.log("RightMax:",SizeA,"BottomMax:",SizeB);
+    // console.log(TopMin,LeftMin)
+    // console.log(shiftDistanceAlign,shiftDistanceVerticle);
+    for(let i in gridCrossMap){
+      gridCrossMap[i][0]-=shiftDistanceVerticle;
+      gridCrossMap[i][1]-=shiftDistanceAlign;
+    }
+    for(let i in gridRoadMap){
+      gridRoadMap[i][0]-=shiftDistanceVerticle;
+      gridRoadMap[i][1]-=shiftDistanceAlign;
+    }
+    // console.log(Roads);
+    // console.log(gridRoadMap);
+    //逆向记录gridRoadMap和gridCrossMap的映射关系
+    for(let i=0;i<Roads.length;i++){
+      gridMap[gridRoadMap[Roads[i]["id"]].join()]=Roads[i];
+    }
+    for(let i=0;i<Cross.length;i++){
+      gridMap[gridCrossMap[Cross[i]["id"]].join()]=Cross[i];
+    }
+
+    //处理完数据放入Historys中,取回原来的数据
+    if(Historys.length>=0){
+      Historys.push({"Cars":Cars,"Cross":Cross,"Roads":Roads});
+      Cars=Temp_data["Cars"];
+      Cross=Temp_data["Cross"];
+      Roads=Temp_data["Roads"];
+    }
+  }
+  var updateGridMapOnly=function(){
+    return new Promise((resolve,reject)=>{
+      for(let i=0;i<Roads.length;i++){
+        gridMap[gridRoadMap[Roads[i]["id"]].join()]=Roads[i];
+      }
+      resolve();
+    });
+  }
+  var CarBox = React.createClass({
+    getInitialState: function(){
+      return {carInfo:0,id:"",info:{"id":0,"speed":0},"track":TrackCar};
+    },
+    componentDidMount:function(){
+      let that=this;
+      PubSub.subscribe("trackCar",()=>{
+        that.setState({track:TrackCar});
+      });
+    },
+    render:function(){
+      let roadLen = this.props.roadLen;
+      let roadString=this.props.roadString;
+      let n = this.props.pos;
+      let channel = this.props.channel;
+      let direction = parseInt(this.props.direction);
+      let nowstatus;
+      let i,j;
+      let BoxStyle={};
+      if(this.props.cars){
+      if(direction==1){
+        i=Math.floor(n/roadLen)+1;
+        j=n%roadLen+1;
+        //not first row
+        if(i!=1){
+          BoxStyle["borderTop"]="1px solid #BB78E9";
+        }
+        if(j!=1){
+          BoxStyle["borderLeft"]="1px dotted #E27F3E";
+        }
+        nowstatus = this.props.cars[i-1][j-1];
+      }else{
+        i=n%roadLen+1;
+        //由于竖着的道路上下颠倒了,需要更改i的坐标
+        j=Math.floor(n/roadLen)+1;
+        //not first column
+        if(j!=1){
+          BoxStyle["borderLeft"]="1px solid #BB78E9";
+        }
+        if(i!=1){
+          BoxStyle["borderTop"]="1px dotted #E27F3E";
+        }
+
+        // nowstatus = this.props.cars[roadLen-j+1-1][channel-i+1-1];
+        nowstatus = this.props.cars[j-1][i-1];
+        let tmp_c = this.props.cars.length;
+        let tmp_l = this.props.cars[0].length;
+        //try change
+        let new_j=parseInt((tmp_c-j));
+        let new_i=parseInt((tmp_l-i));
+        // if(this.props.cars[new_j]==undefined){
+        //   console.log("old:",j-1,",",i-1);
+        //   console.log(new_j,new_i);
+        //   console.log("size: ",tmp_c,tmp_l);
+        // }
+        nowstatus = this.props.cars[new_j][new_i];
+
+        // nowstatus = this.props.cars[new_j][new_i];
+        // nowstatus = this.props.cars[new_j][new_i];
+        // console.log(new_j<this.props.cars[0].length,new_i<this.props.cars[0].length);
+        }
+      }
+      let car_self;
+      for(let cc=0;cc<Cars.length;cc++){
+        if(Cars[cc]["id"]==nowstatus){
+          car_self=Cars[cc];
+          break;
+        }
+      }
+      BoxStyle["gridRow"]=i;
+      BoxStyle["gridColumn"]=j;
+      this.state.id=roadString+"_box_"+String(n);
+      this.state.info={"id":nowstatus};
+      if(nowstatus==0){
+        this.state.carInfo=0;
+        return <div key={"box_"+String(n)} style={BoxStyle} className={"car_status0 car_box"} id={roadString+"_box_"+String(i)+"_"+String(j)}></div>
+      }else{
+        this.state.carInfo=1;
+        BoxStyle["backgroundColor"]=CarHashMap[nowstatus]["color"];
+        if(this.state.track==nowstatus){
+          // BoxStyle["backgroundColor"]="#000000";
+        }
+        return <div key={"box_"+String(n)} style={BoxStyle} className={("car_status1 car_box tips ")+(this.state.track==nowstatus?"tips_show trackCar":"")} data-id={nowstatus} id={roadString+"_box_"+String(i)+"_"+String(j)}><span>{nowstatus+","+car_self["speed"]}</span></div>
+      }
+    }
+  })
+  var RoadView=React.createClass({
+    getInitialState:function(){
+      return {update:false};
+    },
+    componentDidMount:function(){
+      //此时子组件都挂载好了
+      //监听更新子组件的事件
+      PubSub.subscribe("updateCars",(data)=>{
+        // console.log("recive",data);
+        if(data){
+          //update your cars grid,重新渲染该组件
+          this.setState({update:true});
+        }
+      });
+    },
+    render:function(){
+      let i=this.props.i;
+      let j=this.props.j;
+      let GridStyle={
+        "gridRow":i,
+        "gridColumn":j
+      }
+
+      let index=String(i)+","+String(j);
+      if(i%2!=0){
+        //横
+        if(gridMap[index]!=undefined){
+          //有路
+          GridStyle["display"]="grid";
+          let r=gridMap[index];
+          let cars=r["status"];
+          let channel = r["channel"];
+          let len = r["length"];
+          let isDuplex = r["isDuplex"];
+          let capacity=r["status"].length*r["status"][0].length;
+          let carBoxes=[];
+          let area = String(Math.sqrt(150*60/capacity)) + "px";
+          for(let n=0;n<capacity;n++){
+              carBoxes.push(<CarBox key={"grid_"+String(i)+"_"+String(j)+String(n)} channel={channel*(isDuplex+1)} cars={cars} roadLen={len} direction="1" roadString={"grid_"+String(i)+"_"+String(j)} pos={n}/>);
+          }
+          return (<div key={"grid_"+String(i)+"_"+String(j)} name={String(channel)+"*"+String(len)+"*"+String(isDuplex*2)} style={GridStyle} className="grid_roads1 item active_roads" id={"grid_"+String(i)+"_"+String(j)}><div className="grid_roads1_container">{carBoxes}</div></div>);
+        }else{
+          //无路
+          GridStyle["border"]="0px";
+          GridStyle["marginLeft"]="-1px";
+          GridStyle["marginRight"]="-1px";
+          GridStyle["borderLeft"]="2px solid #000";
+          GridStyle["borderRight"]="2px solid #000";
+        return (<div key={"grid_"+String(i)+"_"+String(j)} style={GridStyle} className="grid_roads1 item" id={"grid_"+String(i)+"_"+String(j)}></div>);
+        }
+      }else{
+        //竖
+        if(gridMap[index]!=undefined){
+          //有路
+          GridStyle["display"]="grid";
+          let r=gridMap[index];
+          let cars=r["status"];
+          let channel = r["channel"];
+          let len = r["length"];
+          let isDuplex = r["isDuplex"];
+          let capacity=r["status"].length*r["status"][0].length;
+          let carBoxes=[];
+          let area = String(Math.sqrt(150*60/capacity)) + "px";
+          for(let n=0;n<capacity;n++){
+              carBoxes.push(<CarBox key={"grid_"+String(i)+"_"+String(j)+String(n)} channel={channel} cars={cars} roadLen={len} direction="2" roadString={"grid_"+String(i)+"_"+String(j)} pos={n}/>);
+          }
+          return (<div key={"grid_"+String(i)+"_"+String(j)} name={String(channel)+"*"+String(len)+"*"+String(isDuplex*2)} style={GridStyle} className="grid_roads2 item active_roads" id={"grid_"+String(i)+"_"+String(j)}><div className="grid_roads2_container">{carBoxes}</div></div>);
+          // return (<div key={"grid_"+String(i)+"_"+String(j)} style={GridStyle} className="grid_roads2 item active_roads" id={"grid_"+String(i)+"_"+String(j)}></div>);
+        }else{
+          //无路
+          GridStyle["border"]="0px";
+          GridStyle["marginTop"]="-1px";
+          GridStyle["marginBottom"]="-1px";
+          GridStyle["borderTop"]="1px solid #000";
+          GridStyle["borderBottom"]="1px solid #000";
+          return (<div key={"grid_"+String(i)+"_"+String(j)} style={GridStyle} className="grid_roads2 item" id={"grid_"+String(i)+"_"+String(j)}></div>);
+        }
+      }
+    }
+  });
+  var CrossView=React.createClass({
+    getInitialState: function(){
+      return {showInfo:true,carsInfo:0};
+    },
+    // handleMouseEnter:function(){
+    //   this.setState({showInfo:true});
+    // },
+    // handleMouseLeave:function(){
+    //   this.setState({showInfo:false});
+    // },
+    render:function()
+    {
+      let i =  this.props.i;
+      let j =  this.props.j;
+      let GridStyle={
+        "gridRow":i,
+        "gridColumn":j
+      }
+
+      let index=String(i)+","+String(j);
+      if(gridMap[index]!=undefined){
+        //激活路口
+        return (<div onMouseEnter={this.handleMouseEnter} onMouseLeave={this.handleMouseLeave} key={"grid_"+String(i)+"_"+String(j)} style={GridStyle} className="grid_cross item active_cross" id={"grid_"+String(i)+"_"+String(j)}>
+        <div className="cross_info">
+        <span className="cross_info_id">{!this.state.showInfo?"":gridMap[index]["id"]}</span><br />
+        <span className="cross_info_start_cars">{!this.state.showInfo?"":gridMap[index]["start_cars"]}</span>{!this.state.showInfo?"":"|"}
+        <span className="cross_info_arrive_cars">{!this.state.showInfo?"":gridMap[index]["arrive_cars"]}</span>
+        </div>
+        </div>);
+      }else{
+        //未激活
+        return (<div key={"grid_"+String(i)+"_"+String(j)} style={GridStyle} className="grid_cross item" id={"grid_"+String(i)+"_"+String(j)}></div>);
+      }
+    }
+  });
+  var StreetView=React.createClass({
+    getInitialState:function(){
+      return {track:TrackRoad};
+    },
+    render:function(){
+      let i =  this.props.i;
+      let j =  this.props.j;
+      let GridStyle={
+        "gridRow":i,
+        "gridColumn":j
+      }
+      //为下面的路输出信息
+      let r_top,r_bottom,r_left,r_right;
+      let index=String(i+1)+","+String(j);
+      r_bottom = gridMap[index];
+      index=String(i)+","+String(j+1);
+      r_right = gridMap[index];
+      //如果是第一列,也显示左边的路
+      if(j==2){
+        index = String(i)+","+String(j-1);
+        r_left=gridMap[index];
+      }
+      //如果是第一行,也显示上面的路
+      if(i==2){
+        index=String(i-1)+","+String(j);
+        r_top=gridMap[index];
+      }
+      let top_info="",left_info="",right_info="",bottom_info="";
+      if(r_top!=undefined){
+        top_info=r_top["id"]+"|  "+r_top["speed"]+"▲";
+      }
+      if(r_left!=undefined){
+        left_info=r_left["id"]+"|  "+r_left["speed"]+"◀";
+      }
+      if(r_right!=undefined){
+        right_info=r_right["id"]+"|  "+r_right["speed"]+"▶";
+      }
+      if(r_bottom!=undefined){
+        bottom_info=r_bottom["id"]+"|  "+r_bottom["speed"]+"▼";
+      }
+
+      let roadInfo=[];
+      roadInfo.push(<div key={"row_1"} className="row row_info"><div key={"col_1"} className="col-md-12 align_info">{top_info}</div></div>);
+      roadInfo.push(<div key={"row_2"} className="row row_info"><div key={"col_21"} className="col-md-4 vertical_info">{left_info}</div><div key={"col_22"} className="col-md-4"></div><div key={"col_23"} className="col-md-4 vertical_info" style={{"position":"relative","right":"0px","left":"30px"}}>{right_info}</div></div>);
+      roadInfo.push(<div key={"row_3"} className="row row_info"><div key={"col_3"} className="col-md-12 align_info" style={{"position":"relative","bottom":"10px"}}>{bottom_info}</div></div>);
+
+      return (<div key={"grid_"+String(i)+"_"+String(j)} style={GridStyle} className="grid_street item" id={"grid_"+String(i)+"_"+String(j)}>{roadInfo}</div>);
+    }
+  })
+
+  var Biggrid=React.createClass({
+    getInitialState: function(){
+      Client_Tick=0;
+      return {update: true,sizea:4,sizeb:4,tickChange:0};
+    },
+    componentWillMount:function() {
+
+      //监听controller的停止信号
+      PubSub.subscribe("stopUpdate",()=>{
+          this.setState({update:false});
+      });
+      PubSub.subscribe("beginUpdate",()=>{
+          this.setState({update:true});
+      });
+      PubSub.subscribe("nextTick",()=>{
+        if(Client_Tick<=(Historys.length-2)){
+          Client_Tick+=1;
+          Cars=Historys[Client_Tick]["Cars"];
+          Cross=Historys[Client_Tick]["Cross"];
+          Roads=Historys[Client_Tick]["Roads"];
+          updateGridMapOnly().then(()=>{
+            PubSub.publish("updateCars",{"update":true});
+            console.log("updateCars",Historys[Client_Tick]);
+          });
+        }
+      });
+      PubSub.subscribe("prevTick",()=>{
+        if(Client_Tick>=1){
+          Client_Tick-=1;
+          Cars=Historys[Client_Tick]["Cars"];
+          Cross=Historys[Client_Tick]["Cross"];
+          Roads=Historys[Client_Tick]["Roads"];
+          updateGridMapOnly().then(()=>{
+            PubSub.publish("updateCars",{"update":true});
+            console.log("updateCars",Historys[Client_Tick]);
+          });
+        }
+      });
+      //组件加载时更新数据
+      let that=this;
+      setInterval(function(){
+        let his=Historys;
+        let cti=Client_Tick;
+        //当update处于开的时候,每1s更新一次数据;
+        if(that.state.update){
+          let tmp=tickUpdate();
+          tmp.then((data)=>{
+            let upd=data["data"]["update"];
+            // console.log("Can I get data?",upd);
+            if(upd==true){
+              getData().then(()=>{
+                // console.log("Update Date, History.length:",his.length," Client_Tick:",Client_Tick);
+              });
+            }else{
+              // console.log("No update");
+            }
+          });
+        }
+      },500);
+      setInterval(function(){
+        let his=Historys;
+        //当update处于开的时候,每3s更新一次渲染
+        if(that.state.update){
+          if(Client_Tick<=his.length-1){
+              Cars=Historys[Client_Tick]["Cars"];
+              Cross=Historys[Client_Tick]["Cross"];
+              Roads=Historys[Client_Tick]["Roads"];
+              updateGridMapOnly().then(()=>{
+                PubSub.publish("updateCars",{"update":true});
+                Client_Tick+=1;
+                console.log("update roads' status! tick:",Client_Tick);
+              });
+          }else{
+            console.log("Do not update data because cti is max. cti:",Client_Tick,"History.length:",his.length);
+          }
+        }
+      },1000);
+
+      getData().then(()=>{
+        if(isNaN(SizeA)){
+          SizeA=4;
+          SizeB=4;
+        }
+        that.setState({sizea:SizeA,sizeb:SizeB});
+      });
+    },
+    render:function(){
+      let rows=[];
+      console.log("draw grid ",this.state.sizea-1,"*",this.state.sizeb-1);
+      for(let i=1;i<this.state.sizea;i++){
+        for(let j=1;j<this.state.sizeb;j++){
+          let GridStyle={
+            "gridRow":i,
+            "gridColumn":j
+          }
+          if(i%2!=0 && j%2!=0){
+            rows.push(<CrossView key={"cross_"+String(i)+"_"+String(j)} i={i} j={j} />);
+          }
+          else if((i+j)%2!=0){
+            rows.push(<RoadView key={"road_"+String(i)+"_"+String(j)} i={i} j={j} />);
+          }else{
+            rows.push(<StreetView key={"street_"+String(i)+"_"+String(j)} i={i} j={j} />);
+          }
+        }
+      }
+      return <div className="container">{rows}</div>;
+    }
+  });
+  var Controller=React.createClass({
+    getInitialState:function(){
+      return {status:true,steps:0,tick:Client_Tick,allTicks:Historys.length,track:10000,hide:false};
+    },
+    componentWillMount:function(){
+      let that=this;
+      setInterval(function(){
+        if(that.state.tick!=Client_Tick || that.state.allTicks != Historys.length){
+          that.setState({tick:Client_Tick,allTicks:Historys.length});
+        }
+      },1000)
+    },
+    handleClickStop:function(){
+      if(this.state.status){
+        //暂停
+        PubSub.publish("stopUpdate");
+        this.setState({status:false});
+      }else{
+        //恢复
+        PubSub.publish("beginUpdate");
+        this.setState({status:true});
+      }
+    },
+    handleNextTick:function(){
+      PubSub.publish("nextTick");
+      this.setState({tick:Client_Tick});
+    },
+    handlePrevTick:function(){
+      PubSub.publish("prevTick");
+      this.setState({tick:Client_Tick});
+    },
+    handleChange:function(e){
+      TrackCar=e.target.value;
+      PubSub.publish("trackCar");
+      this.setState({track:e.target.value});
+    },
+    handleHidePannel:function(e){
+      if(this.state.hide==false){
+        this.setState({"hide":true});
+      }else{
+        this.setState({"hide":false});
+      }
+    },
+    render:function(){
+      return (<div className="panel panel-info controller_panel" style={this.state.hide?{"height":"30px"}:{"height":"auto"}}>
+      <div className="panel-heading">Ctrl<span style={{"float":"right"}}>TICK:{this.state.tick}/{this.state.allTicks}<button style={{"fontSize":"1em"}} className="btn btn-link btn-xs" onClick={this.handleHidePannel}>۞</button></span></div>
+      <div className={"panel-body "+(this.state.hide?"hide_block":"")}>
+      <table className="table">
+      <tbody>
+      <tr><td><button onClick={this.handleClickStop} className="btn btn-default">
+      <i className={this.state.status?"glyphicon glyphicon-pause":"glyphicon glyphicon-play"}></i>
+      </button></td><td></td></tr>
+      <tr><td><button onClick={this.handlePrevTick} className="btn btn-default">Prev</button></td>
+      <td><button onClick={this.handleNextTick} className="btn btn-default">Next</button></td></tr>
+      <tr><td colSpan="2">车辆追踪:<input id="track_car" className="input" onChange={this.handleChange} value={this.state.track}/></td><td></td></tr>
+      </tbody>
+      </table>
+      </div>
+      </div>);
+    }
+  });
+  ReactDOM.render(<div className="map"><Biggrid /><Controller /></div>,document.getElementById("main"));
+
+</script>
+
+
+</html>

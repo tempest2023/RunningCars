@@ -1,0 +1,15 @@
+{
+  "apps": [{
+    "name": "RunningCars",
+    "script": "production.js",
+    "cwd": "/Users/rentao/Downloads/华为软挑/2019软挑-初赛-SDK/SDK/SDK_python/RunningCars",
+    "exec_mode": "fork",
+    "max_memory_restart": "1G",
+    "autorestart": true,
+    "node_args": [],
+    "args": [],
+    "env": {
+      
+    }
+  }]
+}

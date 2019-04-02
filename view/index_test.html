@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+
+<head>
+  <meta charset="utf-8">
+  <title></title>
+</head>
+<style type="text/css">
+  .site__title {
+    color: #f35626;
+    background-image: -webkit-linear-gradient(92deg, #f35626, #feab3a);
+    -webkit-background-clip: text;
+    -webkit-text-stroke: 1px transparent;
+    -webkit-text-fill-color: transparent;
+    -webkit-animation: hue 15s infinite linear;
+  }
+
+  .test {
+    width: 300px;
+    height: 500px;
+    background-image: -webkit-linear-gradient(92deg, #f35626, #feab3a);
+    -webkit-animation: hue 60s infinite linear;
+  }
+
+  @-webkit-keyframes hue {
+    from {
+      -webkit-filter: hue-rotate(0deg);
+    }
+
+    to {
+      -webkit-filter: hue-rotate(-360deg);
+    }
+  }
+</style>
+
+<body>
+  <h1 class="site__title">HELLO WORLD</h1>
+  <div class="test">
+
+  </div>
+</body>
+
+</html>
+<script src="https://unpkg.com/omi"></script>
+<script>
+  const {
+    define,
+    WeElement,
+    h,
+    render
+  } = Omi
+
+  define('my-counter', class extends WeElement {
+    install() {
+      this.data.count = 1
+      this.sub = this.sub.bind(this)
+      this.add = this.add.bind(this)
+    }
+
+    sub() {
+      this.data.count--
+      this.update()
+    }
+
+    add() {
+      this.data.count++
+      this.update()
+    }
+
+    render() {
+      return h(
+        'div',
+        null,
+        h(
+          'button', {
+            onClick: this.sub
+          },
+          '-'
+        ),
+        h(
+          'span',
+          null,
+          this.data.count
+        ),
+        h(
+          'button', {
+            onClick: this.add
+          },
+          '+'
+        ),
+        h(
+          'h1', null,
+          "HELLO WORLD"
+        )
+      )
+    }
+  })
+
+  // render(h('my-counter'), 'body')
+</script>
